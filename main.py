@@ -6,13 +6,14 @@ import umap
 import trimap
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score  # ConfusionMatrixDisplay
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.base import BaseEstimator
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import GridSearchCV
+from sklearn.tree import plot_tree
 
 # Загрузка данных
 data = pd.read_csv('horse-colic.data', header=None, sep=r'\s+', na_values='?')
@@ -131,14 +132,32 @@ def plot_classification_results(X: np.ndarray, y: np.ndarray, model: BaseEstimat
     plt.show()
 
 
+def visualize_random_forest_trees(model: RandomForestClassifier, feature_names: list, class_names: list) -> None:
+    """Визуализирует два дерева из Random Forest."""
+    # Получаем первые два дерева из обученной модели
+    trees = model.estimators_[:2]
+
+    plt.figure(figsize=(12, 8))
+
+    for i, tree in enumerate(trees):
+        plt.subplot(1, 2, i + 1)
+        plot_tree(tree,
+                  feature_names=feature_names,
+                  class_names=class_names,
+                  filled=True,
+                  rounded=True,
+                  fontsize=10)
+        plt.title(f"Дерево {i + 1}")
+
+    plt.tight_layout()
+    plt.show()
+
+
 # Основная программа с выбором классификатора
 while True:
-    print("\nВыберите классификатор:")
-    print("1. KNN-классификатор")
-    print("2. SVM-классификатор")
-    print("3. Random Forest-классификатор")
+    print("\nВыберите классификатор:\n1. KNN-классификатор\n2. SVM-классификатор\n3. Random Forest-классификатор")
 
-    choose = int(input("Введите номер (1, 2 или 3): "))
+    choose = int(input("\nВведите номер (1, 2 или 3): "))
 
     if choose == 1:
         parameters = {
@@ -170,8 +189,15 @@ while True:
         clf = make_pipeline(MinMaxScaler(), RandomForestClassifier())
         print("Запуск Random Forest-классификатора...")
 
+        # Запрос на визуализацию деревьев
+        visualize_trees = input("Хотите визуализировать два дерева Random Forest? (да/нет): ").strip().lower()
+        if visualize_trees in ['да', 'yes', 'да']:
+            feature_names = [f'Feature {i}' for i in range(X_train.shape[1])]
+            class_names = [str(i) for i in np.unique(y_train)]
+            print("Визуализация деревьев...")
+
     elif choose == 0:
-        print("Завершение работы программы.")
+        print("\nЗавершение работы программы.")
         break
 
     else:
@@ -185,4 +211,7 @@ while True:
 
     evaluate_model(best_model)
     perform_visualization(X_train, best_model.predict(X_train), best_model)
-    plot_classification_results(X_train, y_train, best_model)
+
+    # Визуализация деревьев
+    if choose == 3 and visualize_trees in ['да', 'yes', 'да']:
+        visualize_random_forest_trees(best_model.named_steps['randomforestclassifier'], feature_names, class_names)
