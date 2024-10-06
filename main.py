@@ -1,78 +1,184 @@
-from ucimlrepo import fetch_ucirepo
-# import pandas as pd
-from sklearn.model_selection import train_test_split  # Для обучающей и тестовых выборках
-from sklearn.svm import SVC  # Для обучения модели с линейным ядром
-from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
-from sklearn.model_selection import GridSearchCV  # Для: Перебор по сетке (grid search).
-from sklearn.impute import SimpleImputer  # Для заполнения пропущенных значений
-import time  # Для измерения времени выполнения
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import pacmap
+import umap
+import trimap
+from sklearn.manifold import TSNE
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score  # ConfusionMatrixDisplay
+from sklearn.base import BaseEstimator
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import GridSearchCV
+
+# Загрузка данных
+data = pd.read_csv('horse-colic.data', header=None, sep=r'\s+', na_values='?')
+X_train, y_train = data.drop(columns=[23]).fillna(data.mean()).values, data.iloc[:, 23]
+
+test = pd.read_csv('horse-colic.test', header=None, sep=r'\s+', na_values='?')
+X_test, y_test = test.drop(columns=[23]).fillna(test.mean()).values, test[23]
+
+# Обработка некорректных значений
+X_train = np.nan_to_num(X_train)
+X_test = np.nan_to_num(X_test)
 
 
-# Загружаю сам набор данных
-horse_colic = fetch_ucirepo(id=47)
+# Функции для оценки модели
+def evaluate_model(model: BaseEstimator) -> None:
+    evaluate_model_per_sample(model, 'Обучающая', X_train, y_train)
+    evaluate_model_per_sample(model, 'Тестовая', X_test, y_test)
 
-# Разделяю тут данные на признаки Х и целевые метки У для дальнейшего использования
-X = horse_colic.data.features
-y = horse_colic.data.targets
+    if isinstance(model[-1], SVC):
+        support_vectors_count = model[-1].n_support_
+        print(f"Число опорных векторов для каждого класса: {support_vectors_count}")
 
-# Используем медиану для замены пропущенных значений (NaN), ибо программа не работала с этими пустыми значениями
-imputer = SimpleImputer(strategy='median')
-X_imputed = imputer.fit_transform(X)
 
-# Преобразую в одномерный массив (там тоже прога из-за этого отказывалась, ибо у меня, мол, матрица (пошла куда
-# подальше) )
-y = y.values.ravel()
+def evaluate_model_per_sample(model: BaseEstimator,
+                              sample_name: str,
+                              X: np.ndarray,
+                              y: np.ndarray) -> None:
+    y_pred = model.predict(X)
 
-# Тут реализую пункт "Обучить, проверить качество классификатора на обучающей и тестовой
-# выборках". То есть разделил данные на 70 % обучающей и тестовую 30 % выборки
-X_train, X_test, y_train, y_test = train_test_split(X_imputed, y, test_size=0.3, random_state=42)
+    accuracy = accuracy_score(y, y_pred)
+    precision = precision_score(y, y_pred, average='weighted')
+    recall = recall_score(y, y_pred, average='weighted')
+    f1 = f1_score(y, y_pred, average='weighted')
 
-# # Измеряем время обучения модели
-start_time = time.time()
+    print(
+        f"[{sample_name}] Точность: {accuracy:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, "
+        f"F1-мера: {f1:.4f}")
 
-# Как раз-таки содание SVM классификатора с линейным ядром (linear) и обучением его
-svm_model = SVC(kernel='linear', C=1.0)
-svm_model.fit(X_train, y_train)
 
-# Прогнозирование на тест. выборке
-y_pred = svm_model.predict(X_test)
+# Функции для визуализации
+def visualize(X: np.ndarray, y: np.ndarray, method_name: str, support_vectors=None, ax=None) -> None:
+    classes = np.unique(y)
+    colors = plt.colormaps['tab10']
 
-# ОЦЕНКА КАЧЕСТВА КЛАССИФИКАТОРА
-accuracy = accuracy_score(y_test, y_pred)  # Точность
-recall = recall_score(y_test, y_pred, average='macro')
-precision = precision_score(y_test, y_pred, average='macro')
-f1 = f1_score(y_test, y_pred, average='macro')
+    for clazz in classes:
+        idx = y == clazz
+        ax.scatter(X[idx, 0], X[idx, 1], alpha=0.45, c=[colors(clazz)], label=f"Класс {clazz}")
+        if support_vectors is not None:
+            support_vector_idx = support_vectors[np.isin(support_vectors, np.where(idx)[0])]
+            ax.scatter(X[support_vector_idx, 0], X[support_vector_idx, 1],
+                       marker='D', alpha=0.6, c=[colors(clazz)],
+                       edgecolors='black', label=f"Опорные векторы класса {clazz}")
 
-# Сделал, чтобы просто посмотреть результат метрик
-print(f"Accuracy: {accuracy}")
-print(f"Recall: {recall}")
-print(f"Precision: {precision}")
-print(f"F1 Score: {f1}")
+    ax.set_title(f"Визуализация методом {method_name}")
+    ax.legend()
 
-# Тут из методички "Оценить число опорных векторов."
-print("Number of support vectors per class:", svm_model.n_support_)
 
-# Вывод времени обучения модели
-print("Training and evaluation took %.2f seconds" % (time.time() - start_time))
+def perform_visualization(X: np.ndarray, y: np.ndarray, model: BaseEstimator, support_vectors=None) -> None:
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    fig.suptitle("Сравнение методов уменьшения размерности", fontsize=16)
 
-# Перебор по сетке (grid search).
+    tsne_reducer = TSNE(n_components=2, perplexity=30, max_iter=1000, random_state=42)
+    X_tsne = tsne_reducer.fit_transform(X)
+    visualize(X_tsne, y, "t-SNE", support_vectors, ax=axes[0, 0])
 
-# Определяем параметры для поиска (тут и линейное, RBF, полиномиальное,
-# сигмоидное)
-param_grid = {
-    'C': [0.1, 1, 10],
-    'kernel': ['linear', 'rbf', 'poly', 'sigmoid'],
-    'gamma': ['scale', 'auto']
-}
+    umap_reducer = umap.UMAP(n_components=2, n_neighbors=15, min_dist=0.1)
+    X_umap = umap_reducer.fit_transform(X)
+    visualize(X_umap, y, "UMAP", support_vectors, ax=axes[0, 1])
 
-# Создаю объект для дальнейшей работы
-grid_search = GridSearchCV(SVC(), param_grid, cv=5, scoring='accuracy')
-# Поиск по сетке
-start_time_grid = time.time()
-grid_search.fit(X_train, y_train)
+    trimap_reducer = trimap.TRIMAP(n_inliers=10, n_outliers=5, n_random=5)
+    X_trimap = trimap_reducer.fit_transform(X)
+    visualize(X_trimap, y, "TriMAP", support_vectors, ax=axes[1, 0])
 
-# Вывод лучших параметров (потом можно переделать)
-print("Best parameters:", grid_search.best_params_)
+    pacmap_reducer = pacmap.PaCMAP(n_components=2, n_neighbors=10, MN_ratio=0.5, FP_ratio=2.0)
+    X_pacmap = pacmap_reducer.fit_transform(X)
+    visualize(X_pacmap, y, "PacMAP", support_vectors, ax=axes[1, 1])
 
-# Вывод времени поиска по сетке
-print("Grid search took %.2f seconds" % (time.time() - start_time_grid))
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.show()
+
+
+def plot_classification_results(X: np.ndarray, y: np.ndarray, model: BaseEstimator) -> None:
+    colors = plt.colormaps['tab10']
+    y_pred = model.predict(X)
+
+    pacmap_reducer = pacmap.PaCMAP(n_components=2, n_neighbors=10, MN_ratio=0.5, FP_ratio=2.0)
+    X = pacmap_reducer.fit_transform(X)
+
+    plt.figure(figsize=(14, 6))
+
+    plt.subplot(1, 2, 1)
+    for clazz in np.unique(y):
+        idx = y == clazz
+        plt.scatter(X[idx, 0], X[idx, 1],
+                    label=f"Класс {clazz}",
+                    alpha=0.6,
+                    s=50,
+                    c=[colors(clazz)])
+
+    plt.title('Известные метки')
+    plt.legend()
+
+    plt.subplot(1, 2, 2)
+    for clazz in np.unique(y_pred):
+        idx = y_pred == clazz
+        plt.scatter(X[idx, 0], X[idx, 1],
+                    label=f"Класс {clazz}",
+                    alpha=0.6,
+                    s=50,
+                    c=[colors(clazz)])
+
+    plt.title('Предсказанные метки')
+    plt.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
+# Основная программа с выбором классификатора
+while True:
+    print("Выберите классификатор:")
+    print("1. KNN-классификатор")
+    print("2. SVM-классификатор")
+    print("3. Random Forest-классификатор")
+
+    choose = int(input("Введите номер (1, 2 или 3): "))
+
+    if choose == 1:
+        parameters = {
+            'kneighborsclassifier__n_neighbors': [3, 5, 7, 10],
+            'kneighborsclassifier__metric': ['euclidean', 'manhattan', 'chebyshev', 'minkowski'],
+            'kneighborsclassifier__weights': ['uniform', 'distance']
+        }
+        clf = make_pipeline(MinMaxScaler(), KNeighborsClassifier())
+        print("Запуск KNN-классификатора...")
+
+    elif choose == 2:
+        parameters = {
+            'svc__kernel': ['linear', 'rbf', 'poly', 'sigmoid'],
+            'svc__C': [0.1, 1, 10, 100],
+            'svc__gamma': ['scale', 'auto'],
+            'svc__degree': [2, 3, 4]
+        }
+        clf = make_pipeline(MinMaxScaler(), SVC())
+        print("Запуск SVM-классификатора...")
+
+    elif choose == 3:
+        parameters = {
+            'randomforestclassifier__n_estimators': [50, 100, 200],
+            'randomforestclassifier__max_depth': [None, 10, 20, 30],
+            'randomforestclassifier__min_samples_split': [2, 5, 10],
+            'randomforestclassifier__min_samples_leaf': [1, 2, 4],
+            'randomforestclassifier__bootstrap': [True, False]
+        }
+        clf = make_pipeline(MinMaxScaler(), RandomForestClassifier())
+        print("Запуск Random Forest-классификатора...")
+
+    else:
+        print("Неверный выбор, попробуйте снова.")
+        continue
+
+    grid = GridSearchCV(clf, parameters, cv=5, scoring='accuracy')
+    grid.fit(X_train, y_train)
+    best_model = grid.best_estimator_
+    print(f"\nЛучшие параметры: {grid.best_params_}\n")
+
+    evaluate_model(best_model)
+    perform_visualization(X_train, best_model.predict(X_train), best_model)
+    plot_classification_results(X_train, y_train, best_model)
