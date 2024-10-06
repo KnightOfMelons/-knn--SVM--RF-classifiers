@@ -1,0 +1,7 @@
+Введите номер (1, 2 или 3): 3
+Запуск Random Forest-классификатора...
+
+Лучшие параметры: {'randomforestclassifier__bootstrap': True, 'randomforestclassifier__max_depth': None, 'randomforestclassifier__min_samples_leaf': 4, 'randomforestclassifier__min_samples_split': 10, 'randomforestclassifier__n_estimators': 50}
+
+[Обучающая] Точность: 0.9167, Precision: 0.9199, Recall: 0.9167, F1-мера: 0.9149
+[Тестовая] Точность: 0.8676, Precision: 0.8681, Recall: 0.8676, F1-мера: 0.8661

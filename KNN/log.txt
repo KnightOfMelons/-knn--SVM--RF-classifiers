@@ -1,0 +1,7 @@
+Введите номер (1, 2 или 3): 1
+Запуск KNN-классификатора...
+
+Лучшие параметры: {'kneighborsclassifier__metric': 'euclidean', 'kneighborsclassifier__n_neighbors': 10, 'kneighborsclassifier__weights': 'distance'}
+
+[Обучающая] Точность: 1.0000, Precision: 1.0000, Recall: 1.0000, F1-мера: 1.0000
+[Тестовая] Точность: 0.8824, Precision: 0.8852, Recall: 0.8824, F1-мера: 0.8830

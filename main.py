@@ -55,7 +55,7 @@ def evaluate_model_per_sample(model: BaseEstimator,
 # Функции для визуализации
 def visualize(X: np.ndarray, y: np.ndarray, method_name: str, support_vectors=None, ax=None) -> None:
     classes = np.unique(y)
-    colors = plt.colormaps['tab10']
+    colors = plt.colormaps['Set1']
 
     for clazz in classes:
         idx = y == clazz
@@ -95,7 +95,7 @@ def perform_visualization(X: np.ndarray, y: np.ndarray, model: BaseEstimator, su
 
 
 def plot_classification_results(X: np.ndarray, y: np.ndarray, model: BaseEstimator) -> None:
-    colors = plt.colormaps['tab10']
+    colors = plt.colormaps['Set1']
     y_pred = model.predict(X)
 
     pacmap_reducer = pacmap.PaCMAP(n_components=2, n_neighbors=10, MN_ratio=0.5, FP_ratio=2.0)
@@ -133,7 +133,7 @@ def plot_classification_results(X: np.ndarray, y: np.ndarray, model: BaseEstimat
 
 # Основная программа с выбором классификатора
 while True:
-    print("Выберите классификатор:")
+    print("\nВыберите классификатор:")
     print("1. KNN-классификатор")
     print("2. SVM-классификатор")
     print("3. Random Forest-классификатор")
@@ -169,6 +169,10 @@ while True:
         }
         clf = make_pipeline(MinMaxScaler(), RandomForestClassifier())
         print("Запуск Random Forest-классификатора...")
+
+    elif choose == 0:
+        print("Завершение работы программы.")
+        break
 
     else:
         print("Неверный выбор, попробуйте снова.")
